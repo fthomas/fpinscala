@@ -15,17 +15,22 @@ object Exercises {
 
   def lift[A](f: (Boolean, Boolean) => Boolean,
               g: Pred[A],
-              h: Pred[A]): Pred[A] = sys.error("todo")
+              h: Pred[A]): Pred[A] =
+    a => f(g(a), h(a))
 
-  def curry[A,B,C](f: (A, B) => C): A => B => C = sys.error("todo")
+  def curry[A,B,C](f: (A, B) => C): A => B => C =
+    a => (b => f(a, b))
 
-  def uncurry[A,B,C](f: A => B => C): (A, B) => C = sys.error("todo")
+  def uncurry[A,B,C](f: A => B => C): (A, B) => C =
+    (a, b) => (f(a))(b)
 
-  def compose[A,B,C](f: B => C, g: A => B): A => C = sys.error("todo")
+  def compose[A,B,C](f: B => C, g: A => B): A => C =
+    a => f(g(a))
 
   def lift3[A,B,C,D,E](f: (B, C, D) => E)(g: A => B,
                                           h: A => C,
-                                          i: A => D): A => E = sys.error("todo")
+                                          i: A => D): A => E =
+    a => f(g(a), h(a), i(a))
 
   def fib(n: Int): Int = sys.error("todo")
 
