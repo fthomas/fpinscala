@@ -20,7 +20,10 @@ object Monoid {
     val zero = Nil
   }
 
-  val intAddition: Monoid[Int] = sys.error("todo")
+  val intAddition: Monoid[Int] = new Monoid[Int] {
+    def op(a1: Int, a2: Int) = a1 + a2
+    val zero = 0
+  }
 
   val intMultiplication: Monoid[Int] = sys.error("todo")
 
