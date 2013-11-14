@@ -67,6 +67,9 @@ object List { // `List` companion object. Contains functions for creating and wo
       case Cons(x, xs) => 1 + length(xs)
     }
 
+  def length_2[A](l: List[A]): Int =
+    foldLeft(l, 0)((x, _) => x + 1)
+
   def foldLeft[A,B](l: List[A], z: B)(f: (B, A) => B): B =
     l match {
       case Nil => z
