@@ -49,7 +49,7 @@ object Monoid {
   def endoMonoid[A]: Monoid[A => A] = new Monoid[A => A] {
     def op(a1: A => A, a2: A => A) = a1 compose a2
     //def op(a1: A => A, a2: A => A) = a2 compose a1
-    val zero = a => a
+    val zero = (a: A) => a
   }
 
   // TODO: Placeholder for `Prop`. Remove once you have implemented the `Prop`
