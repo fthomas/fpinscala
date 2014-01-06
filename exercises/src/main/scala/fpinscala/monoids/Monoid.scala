@@ -52,6 +52,11 @@ object Monoid {
     val zero = (a: A) => a
   }
 
+  def dual[A](monoid: Monoid[A]): Monoid[A] = new Monoid[A] {
+    def op(a1: A, a2: A) = monoid.op(a2, a1)
+    def zero = monoid.zero
+  }
+
   // TODO: Placeholder for `Prop`. Remove once you have implemented the `Prop`
   // data type from Part 2.
   trait Prop {}
@@ -75,13 +80,23 @@ object Monoid {
     as.foldLeft(m.zero)((b: B, a: A) => m.op(f(a), b))
 
   def foldRight[A, B](as: List[A])(z: B)(f: (A, B) => B): B =
-    sys.error("todo")
+    foldMap(as, endoMonoid[B])(f.curried)(z)
 
   def foldLeft[A, B](as: List[A])(z: B)(f: (B, A) => B): B =
-    sys.error("todo")
+    foldMap(as, dual(endoMonoid[B]))(a => b => f(b, a))(z)
 
-  def foldMapV[A, B](as: IndexedSeq[A], m: Monoid[B])(f: A => B): B =
-    sys.error("todo")
+  def foldMapV[A, B](as: IndexedSeq[A], m: Monoid[B])(f: A => B): B = {
+    if (as.length == 0)
+      f(m.zero)
+    else if (as.length == 1)
+      f(as(0))
+    else {
+      val (as1, as2) = as.splitAt(as.length / 2)
+      val b1 = foldMapV(as1, m)(f)
+      val b2 = foldMapV(as2, m)(f)
+      m.op(b1, b2)
+    }
+  }
 
   def ordered(ints: IndexedSeq[Int]): Boolean =
     sys.error("todo")
