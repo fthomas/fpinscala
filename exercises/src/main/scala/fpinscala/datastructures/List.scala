@@ -93,9 +93,40 @@ object List { // `List` companion object. Contains functions for creating and wo
       case Cons(x, xs) => foldLeft(xs, f(z, x))(f)
     }
 
+  // exercise 3.12
+  def reverse[A](l: List[A]): List[A] =
+    foldLeft(l, Nil: List[A])((a, b) => Cons(b, a))
+
+  // exercise 3.13
+  def foldRight2[A,B](l: List[A], z: B)(f: (A, B) => B): B =
+    foldLeft(l, (b: B) => b)((g, a) => b =>  g(f(a, b)))(z)
+
+  def foldLeft2[A,B](l: List[A], z: B)(f: (B, A) => B): B =
+    foldRight(l, (b: B) => b)((a, g) => b => g(f(b, a)))(z)
+
+  // exercise 3.14
+  def append2[A](a1: List[A], a2: List[A]): List[A] =
+    foldRight(a1, a2)((a, b) => Cons(a, b))
+
+  // exercise 3.15
+  def flatten[A](l: List[List[A]]): List[A] =
+    foldLeft(l, Nil: List[A])(append)
+
+  // exercise 3.18
   def map[A,B](l: List[A])(f: A => B): List[B] =
     l match {
       case Nil => Nil
       case Cons(x, xs) => Cons(f(x), map(xs)(f))
     }
+
+  // exercise 3.19
+  def filter[A](l: List[A])(f: A => Boolean): List[A] =
+    l match {
+      case Nil => Nil
+      case Cons(x, xs) => {
+        val t = filter(xs)(f)
+        if (f(x)) Cons(x, t) else t
+      }
+    }
+
 }
