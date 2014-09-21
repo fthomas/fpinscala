@@ -12,6 +12,11 @@ trait Functor[F[_]] {
 
   def distribute[A,B](fab: F[(A, B)]): (F[A], F[B]) =
     (map(fab)(_._1), map(fab)(_._2))
+
+  def codistribute[A,B](e: Either[F[A], F[B]]): F[Either[A, B]] = e match {
+    case Left(fa) => map(fa)(Left(_))
+    case Right(fb) => map(fb)(Right(_))
+  }
 }
 
 object Functor {
@@ -65,6 +70,9 @@ trait Monad[F[_]] extends Functor[F] {
 
   def join[A](mma: F[F[A]]): F[A] = flatMap(mma)(ma => ma)
 
+  def filterM[A](ms: List[A])(f: A => F[Boolean]): F[List[A]] =
+    ms.foldRight(unit(List[A]()))((x,y) =>
+      compose(f, (b: Boolean) => if (b) map2(unit(x),y)(_ :: _) else y)(x))
 }
 
 case class Reader[R, A](run: R => A)
@@ -130,6 +138,18 @@ object Monad {
     def unit[A](a: => A) = Id(a)
     override def flatMap[A,B](ida: Id[A])(f: A => Id[B]): Id[B] = ida flatMap f
   }
+
+  def getState[S]: State[S,S] = State(s => (s,s))
+  def setState[S](s: S): State[S,Unit] = State(_ => ((),s))
+
+  val F = stateMonad[Int]
+
+  def zipWithIndex[A](as: List[A]): List[(Int,A)] =
+    as.foldLeft(F.unit(List[(Int, A)]()))((acc,a) => for {
+      xs <- acc
+      n  <- getState
+      _  <- setState(n + 1)
+    } yield (n, a) :: xs).run(0)._1.reverse
 
   // The action of Reader's `flatMap` is to pass the `r` argument along to both the
   // outer Reader and also to the result of `f`, the inner Reader. Similar to how

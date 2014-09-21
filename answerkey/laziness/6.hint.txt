@@ -1,1 +1,0 @@
-Make `foldRight` abstract on `Stream` and give it two concrete implementations, one in `Empty` and one in `Cons`.

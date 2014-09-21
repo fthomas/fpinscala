@@ -1,1 +1,0 @@
-You can use the `trim` method on `String` to remove excess whitespace from the ends of a string.
