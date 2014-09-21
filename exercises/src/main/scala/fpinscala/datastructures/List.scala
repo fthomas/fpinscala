@@ -53,7 +53,11 @@ object List { // `List` companion object. Contains functions for creating and wo
       case Cons(_, xs) => xs
     }
 
-  def setHead[A](l: List[A], h: A): List[A] = sys.error("todo")
+  def setHead[A](l: List[A], h: A): List[A] =
+    l match {
+      case Nil => throw new Exception
+      case Cons(_, t) => Cons(h, t)
+    }
 
   def drop[A](l: List[A], n: Int): List[A] =
     l match {
@@ -61,9 +65,18 @@ object List { // `List` companion object. Contains functions for creating and wo
       case _ => l
     }
 
-  def dropWhile[A](l: List[A], f: A => Boolean): List[A] = sys.error("todo")
+  def dropWhile[A](l: List[A], f: A => Boolean): List[A] =
+    l match {
+      case Cons(x, xs) if f(x) => dropWhile(xs, f)
+      case _ => l
+    }
 
-  def init[A](l: List[A]): List[A] = sys.error("todo")
+  def init[A](l: List[A]): List[A] =
+    l match {
+      case Cons(x, Nil) => Nil
+      case Cons(x, xs)  => Cons(x, init(xs))
+      case Nil          => throw new Exception
+    }
 
   def length[A](l: List[A]): Int =
     l match {
