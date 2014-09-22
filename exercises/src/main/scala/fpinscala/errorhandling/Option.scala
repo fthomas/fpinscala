@@ -17,22 +17,13 @@ sealed trait Option[+A] {
     }
 
   def flatMap[B](f: A => Option[B]): Option[B] =
-    this match {
-      case Some(a) => f(a)
-      case None    => None
-    }
+    map(f).getOrElse(None)
 
   def orElse[B>:A](ob: => Option[B]): Option[B] =
-    this match {
-      case Some(a) => Some(a)
-      case None    => ob
-    }
+    flatMap(Some(_)).getOrElse(ob)
 
   def filter(f: A => Boolean): Option[A] =
-    this match {
-      case Some(a) if f(a) => Some(a)
-      case _               => None
-    }
+    flatMap(a => if (f(a)) Some(a) else None)
 }
 case class Some[+A](get: A) extends Option[A]
 case object None extends Option[Nothing]
