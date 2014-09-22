@@ -42,4 +42,19 @@ object Either {
     try Right(a)
     catch { case e: Exception => Left(e) }
 
+  // exercise 4.7
+
+  def sequence[E, A](es: List[Either[E, A]]): Either[E, List[A]] =
+    traverse(es)(identity)
+
+  def traverse[E, A, B](as: List[A])(f: A => Either[E, B]): Either[E, List[B]] = {
+    def cons(x: A, y: Either[E, List[B]]): Either[E, List[B]] =
+      for {
+        xv <- f(x)
+        yv <- y
+      } yield xv :: yv
+
+    val z: Either[E, List[B]] = Right(Nil)
+    as.foldRight(z)(cons)
+  }
 }
