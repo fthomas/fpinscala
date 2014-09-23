@@ -20,15 +20,37 @@ trait Stream[+A] {
     case Empty => None
     case Cons(h, t) => if (f(h())) Some(h()) else t().find(f)
   }
-  def take(n: Int): Stream[A] = sys.error("todo")
 
-  def drop(n: Int): Stream[A] = sys.error("todo")
+  def take(n: Int): Stream[A] =
+    this match {
+      case Cons(h, t) if n > 0 => Cons(h, () => t().take(n - 1))
+      case _ => Stream.empty[A]
+    }
 
-  def takeWhile(p: A => Boolean): Stream[A] = sys.error("todo")
+  def drop(n: Int): Stream[A] =
+    this match {
+      case Cons(h, t) if n > 0 => t().drop(n - 1)
+      case _ => this
+    }
 
-  def forAll(p: A => Boolean): Boolean = sys.error("todo")
+  def takeWhile(p: A => Boolean): Stream[A] =
+    this match {
+      case Cons(h, t) if p(h()) => Cons(h, () => t().takeWhile(p))
+      case _ => Stream.empty[A]
+    }
 
-  def startsWith[B](s: Stream[B]): Boolean = sys.error("todo")
+  def takeWhile2(p: A => Boolean): Stream[A] =
+    foldRight(Stream.empty[A])((h, t) => if p(h))
+
+  def forAll(p: A => Boolean): Boolean =
+    foldRight(true)((h, t) => p(h) && t)
+
+  def startsWith[B](s: Stream[B]): Boolean =
+    (this, s) match {
+      case (_, Empty)          => true
+      case (Empty, Cons(_, _)) => false
+      case (Cons(h1, t1), Cons(h2, t2)) => (h1() == h2()) && t1().startsWith(t2())
+    }
 }
 case object Empty extends Stream[Nothing]
 case class Cons[+A](h: () => A, t: () => Stream[A]) extends Stream[A]
