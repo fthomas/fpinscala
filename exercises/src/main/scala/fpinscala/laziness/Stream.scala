@@ -101,6 +101,12 @@ trait Stream[+A] {
      case (Empty,        Cons(h2, t2)) => Some((None, Some(h2())), (Empty, t2()))
      case (Empty,        Empty)        => None
    }
+
+  def tails: Stream[Stream[A]] =
+    unfold(this) {
+      case s@Cons(h, t) => Some((s, t()))
+      case _ => None
+    }
 }
 case object Empty extends Stream[Nothing]
 case class Cons[+A](h: () => A, t: () => Stream[A]) extends Stream[A]
@@ -126,7 +132,6 @@ object Stream {
   def from(n: Int): Stream[Int] =
     cons(n, from(n + 1))
     
-
   def unfold[A, S](z: S)(f: S => Option[(A, S)]): Stream[A] =
     f(z) match {
       case Some((a, s)) => cons(a, unfold(s)(f))
