@@ -70,6 +70,37 @@ trait Stream[+A] {
   def flatMap[B](f: A => Stream[B]): Stream[B] =
     foldRight(Stream.empty[B])((h, t) => f(h).append(t))
 
+  def map2[B](f: A => B): Stream[B] =
+    unfold(this) {
+      case Cons(h, t) => Some((f(h()), t()))
+      case Empty      => None
+    }
+
+  def take2(n: Int): Stream[A] =
+    unfold((this, n)) {
+      case (Cons(h, t), i) if i > 0 => Some((h(), (t(), i - 1)))
+      case _ => None
+    }
+
+  def takeWhile3(f: A => Boolean): Stream[A] =
+    unfold(this) {
+      case Cons(h, t) if f(h()) => Some((h(), t()))
+      case _ => None
+    }
+
+  def zipWith[B](s: Stream[B]): Stream[(A, B)] =
+    unfold((this, s)) {
+      case (Cons(h1, t1), Cons(h2, t2)) => Some(((h1(), h2()), (t1(), t2())))
+      case _ => None
+    }
+
+  def zipAll[B](s: Stream[B]): Stream[(Option[A], Option[B])] =
+   unfold((this, s)) {
+     case (Cons(h1, t1), Cons(h2, t2)) => Some((Some(h1()), Some(h2())), (t1(), t2()))
+     case (Cons(h1, t1), Empty)        => Some((Some(h1()), None), (t1(), Empty))
+     case (Empty,        Cons(h2, t2)) => Some((None, Some(h2())), (Empty, t2()))
+     case (Empty,        Empty)        => None
+   }
 }
 case object Empty extends Stream[Nothing]
 case class Cons[+A](h: () => A, t: () => Stream[A]) extends Stream[A]
@@ -95,8 +126,6 @@ object Stream {
   def from(n: Int): Stream[Int] =
     cons(n, from(n + 1))
     
-  def fibs: Stream[Int] = ???
-    //0 1 1 2 3 5
 
   def unfold[A, S](z: S)(f: S => Option[(A, S)]): Stream[A] =
     f(z) match {
@@ -104,7 +133,8 @@ object Stream {
       case None         => Stream.empty[A]
     }
 
-  // fibs
+  val fibs2: Stream[Int] =
+    unfold((0, 1))(x => Some((x._1, (x._2, x._1 + x._2))))
 
   def constant2[A](a: A): Stream[A] =
     unfold(a)(_ => Some((a, a)))
@@ -112,8 +142,7 @@ object Stream {
   val ones2: Stream[Int] =
     unfold(1)(_ => Some((1, 1)))
 
-  def from(n: Int): Stream[Int] =
+  def from2(n: Int): Stream[Int] =
     unfold(n)(i => Some((i, i + 1)))
 
-  // map, take, takeWhile, zipWith, zipAll
 }
