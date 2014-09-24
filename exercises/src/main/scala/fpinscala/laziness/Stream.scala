@@ -98,9 +98,22 @@ object Stream {
   def fibs: Stream[Int] = ???
     //0 1 1 2 3 5
 
-  def unfold[A, S](z: S)(f: S => Option[(A, S)]): Stream[A] = sys.error("todo")
-  
-  // fibs, from, constant, ones
-  
+  def unfold[A, S](z: S)(f: S => Option[(A, S)]): Stream[A] =
+    f(z) match {
+      case Some((a, s)) => cons(a, unfold(s)(f))
+      case None         => Stream.empty[A]
+    }
+
+  // fibs
+
+  def constant2[A](a: A): Stream[A] =
+    unfold(a)(_ => Some((a, a)))
+
+  val ones2: Stream[Int] =
+    unfold(1)(_ => Some((1, 1)))
+
+  def from(n: Int): Stream[Int] =
+    unfold(n)(i => Some((i, i + 1)))
+
   // map, take, takeWhile, zipWith, zipAll
 }
