@@ -107,6 +107,37 @@ trait Stream[+A] {
       case s@Cons(h, t) => Some((s, t()))
       case _ => None
     }
+
+  def tails2: Stream[Stream[A]] =
+    scanRight(Stream.empty[A])(Stream.cons(_, _))
+
+  def reverse: Stream[A] = {
+    def go(src: Stream[A], dest: Stream[A]): Stream[A] =
+      src match {
+        case Cons(h, t) => go(t(), cons(h(), dest))
+        case Empty      => dest
+      }
+    go(this, empty)
+  }
+
+  def scanRight[B](z: => B)(f: (A, => B) => B): Stream[B] =
+    foldRight((Stream(z), z)) { case (a, (acc, b)) =>
+      val b2 = f(a, b)
+      (cons(b2, acc), b2)
+    }._1
+
+  def scanRight2[B](z: => B)(f: (A, => B) => B): Stream[B] = {
+    def go(src: Stream[A], dest: Stream[B], acc: B): Stream[B] =
+      src match {
+        case Cons(h, t) => {
+          val newAcc = f(h(), acc)
+          go(t(), cons(newAcc, dest), newAcc)
+        }
+        case Empty => dest
+      }
+    go(reverse, Stream(z), z)
+  }
+
 }
 case object Empty extends Stream[Nothing]
 case class Cons[+A](h: () => A, t: () => Stream[A]) extends Stream[A]
