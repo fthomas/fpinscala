@@ -74,11 +74,32 @@ object RNG {
     go(count, rng, List.empty[Int])
   }
 
-  def map2[A,B,C](ra: Rand[A], rb: Rand[B])(f: (A, B) => C): Rand[C] = ???
+  def ints2(count: Int): Rand[List[Int]] =
+    sequence(List.fill(count)(int))
 
-  def sequence[A](fs: List[Rand[A]]): Rand[List[A]] = ???
+  def map2[A,B,C](ra: Rand[A], rb: Rand[B])(f: (A, B) => C): Rand[C] =
+    rng => {
+      val (a, rng2) = ra(rng)
+      val (b, rng3) = rb(rng2)
+      (f(a, b), rng3)
+    }
 
-  def flatMap[A,B](f: Rand[A])(g: A => Rand[B]): Rand[B] = ???
+  def sequence[A](fs: List[Rand[A]]): Rand[List[A]] = {
+    def cons(a: Rand[A], b: Rand[List[A]]): Rand[List[A]] =
+      map2(a, b)(_ :: _)
+
+    val zero = unit(List.empty[A])
+    fs.foldRight(zero)(cons)
+  }
+
+  def flatMap[A,B](f: Rand[A])(g: A => Rand[B]): Rand[B] =
+    rng => {
+      val (a, rng2) = f(rng)
+      g(a)(rng2)
+    }
+
+  def nonNegativeLessThan = ???
+
 }
 
 case class State[S,+A](run: S => (A, S)) {
