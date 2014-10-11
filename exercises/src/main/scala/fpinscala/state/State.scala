@@ -177,7 +177,7 @@ object State {
       }
 
     val functions = inputs.map(i => (m: Machine) => process(i, m))
-    val states = functions.map(State.modify)
+    val states = functions.map(modify)
 
     for {
       _ <- sequence(states)
