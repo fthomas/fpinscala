@@ -150,6 +150,12 @@ object State {
   def set[S](s: S): State[S, Unit] =
     State(_ => ((), s))
 
+  def modify[S](f: S => S): State[S, Unit] =
+    for {
+      s <- get
+      _ <- set(f(s))
+    } yield ()
+
   def sequence[S, A](fs: List[State[S, A]]): State[S, List[A]] = {
     def cons(sa: State[S, A], sl: State[S, List[A]]): State[S, List[A]] =
       sa.map2(sl)(_ :: _)
@@ -160,5 +166,22 @@ object State {
 
   type Rand[A] = State[RNG, A]
 
-  def simulateMachine(inputs: List[Input]): State[Machine, (Int, Int)] = ???
+  def simulateMachine(inputs: List[Input]): State[Machine, (Int, Int)] = {
+    def process(input: Input, machine: Machine): Machine =
+      (input, machine) match {
+        case (_, Machine(_, 0, _)) => machine
+        case (Coin, Machine(false, _, _)) => machine
+        case (Turn, Machine(true, _, _)) => machine
+        case (Coin, Machine(true, candies, coins)) => Machine(false, candies, coins + 1)
+        case (Turn, Machine(false, candies, coins)) => Machine(true,  candies - 1, coins)
+      }
+
+    val functions = inputs.map(i => (m: Machine) => process(i, m))
+    val states = functions.map(State.modify)
+
+    for {
+      _ <- sequence(states)
+      m <- get
+    } yield (m.coins, m.candies)
+  }
 }
