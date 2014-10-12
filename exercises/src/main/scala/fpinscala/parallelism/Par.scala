@@ -22,6 +22,9 @@ object Par {
       val bf = b(es)
       UnitFuture(f(af.get, bf.get)) // This implementation of `map2` does _not_ respect timeouts. It simply passes the `ExecutorService` on to both `Par` values, waits for the results of the Futures `af` and `bf`, applies `f` to them, and wraps them in a `UnitFuture`. In order to respect timeouts, we'd need a new `Future` implementation that records the amount of time spent evaluating `af`, then subtracts that time from the available time allocated for evaluating `bf`.
     }
+
+  // 7.3
+  def map2WithTimeouts = ???
   
   def fork[A](a: => Par[A]): Par[A] = // This is the simplest and most natural implementation of `fork`, but there are some problems with it--for one, the outer `Callable` will block waiting for the "inner" task to complete. Since this blocking occupies a thread in our thread pool, or whatever resource backs the `ExecutorService`, this implies that we're losing out on some potential parallelism. Essentially, we're using two threads when one should suffice. This is a symptom of a more serious problem with the implementation, and we will discuss this later in the chapter.
     es => es.submit(new Callable[A] { 
@@ -43,6 +46,72 @@ object Par {
     es => 
       if (run(es)(cond).get) t(es) // Notice we are blocking on the result of `cond`.
       else f(es)
+
+  def choiceN[A](n: Par[Int])(choices: List[Par[A]]): Par[A] =
+    es => {
+      val m = run(es)(n).get
+      choices(m)(es)
+    }
+
+  def choice2[A](cond: Par[Boolean])(t: Par[A], f: Par[A]): Par[A] =
+    choiceN(map(cond)(b => if (b) 0 else 1))(List(t, f))
+
+  def chooser[A,B](pa: Par[A])(choices: A => Par[B]): Par[B] =
+    es => {
+      val a = run(es)(pa).get
+      choices(a)(es)
+    }
+
+  def choice3[A](cond: Par[Boolean])(t: Par[A], f: Par[A]): Par[A] =
+    chooser(cond)(b => if (b) t else f)
+
+  def choiceN3[A](n: Par[Int])(choices: List[Par[A]]): Par[A] =
+    chooser(n)(i => choices(i))
+
+  def join[A](a: Par[Par[A]]): Par[A] =
+    es => {
+      val inner = run(es)(a).get
+      inner(es)
+    }
+
+  def flatMap[A,B](a: Par[A])(f: A => Par[B]): Par[B] =
+    join(map(a)(f))
+
+  def join2[A](a: Par[Par[A]]): Par[A] =
+    flatMap(a)(identity)
+
+  def lazyUnit[A](a: => A): Par[A] = fork(unit(a))
+
+  def asyncF[A, B](f: A => B): A => Par[B] =
+    a => lazyUnit(f(a))
+
+  def sequence[A](ps: List[Par[A]]): Par[List[A]] = {
+    def cons(pa: Par[A], lp: Par[List[A]]): Par[List[A]] =
+      map2(pa, lp)(_ :: _)
+
+    val zero = unit(List.empty[A])
+    ps.foldRight(zero)(cons)
+  }
+
+  def parFilter[A](as: List[A])(f: A => Boolean): Par[List[A]] = {
+    val p = as.map(asyncF(a => if (f(a)) List(a) else List()))
+    map(sequence(p))(_.flatten)
+  }
+
+  // Hard: Given map(y)(id) == y , it’s a free theorem that
+  // map(map(y)(g))(f) == map(y)(f compose g).
+
+  // y = unit(y')
+  // map(y)(g) = map(unit(y'))(g) = unit(g(y'))
+
+  // map(map(y)(g))(f) ->
+  // map(unit(g(y')))(f) = unit(f(g(y')))
+  // unit((f compose g)(y')) = map(unit(y'))(f compose g) =
+  // h = f compose g
+  // map(unit(y'))(h) = unit(h(y'))
+  // map(y)(h) = unit(h(y'))
+
+
 
   /* Gives us infix syntax for `Par`. */
   implicit def toParOps[A](p: Par[A]): ParOps[A] = new ParOps(p)
