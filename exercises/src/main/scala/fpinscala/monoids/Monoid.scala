@@ -57,16 +57,18 @@ object Monoid {
     def zero = monoid.zero
   }
 
-  // TODO: Placeholder for `Prop`. Remove once you have implemented the `Prop`
-  // data type from Part 2.
-  trait Prop {}
-
-  // TODO: Placeholder for `Gen`. Remove once you have implemented the `Gen`
-  // data type from Part 2.
-
   import fpinscala.testing._
   import Prop._
-  def monoidLaws[A](m: Monoid[A], gen: Gen[A]): Prop = sys.error("todo")
+
+  def monoidLaws[A](m: Monoid[A], gen: Gen[A]): Prop = {
+    val identity = forAll(gen) { a =>
+      m.op(a, m.zero) == a && m.op(m.zero, a) == a
+    }
+    val associativity = forAll(gen ** gen ** gen) { case ((a, b), c) =>
+      m.op(m.op(a, b), c) == m.op(a, m.op(b, c))
+    }
+    identity && associativity
+  }
 
   def trimMonoid(s: String): Monoid[String] = new Monoid[String] {
     def op(a1: String, a2: String) = a1.trim + " " + a2.trim
@@ -98,8 +100,10 @@ object Monoid {
     }
   }
 
-  def ordered(ints: IndexedSeq[Int]): Boolean =
-    sys.error("todo")
+  def ordered(ints: IndexedSeq[Int]): Boolean = {
+    foldMapV(ints, ???)(???)
+    ???
+  }
 
   sealed trait WC
   case class Stub(chars: String) extends WC
@@ -118,8 +122,10 @@ object Monoid {
   def productMonoid[A,B](A: Monoid[A], B: Monoid[B]): Monoid[(A, B)] =
     sys.error("todo")
 
-  def functionMonoid[A,B](B: Monoid[B]): Monoid[A => B] =
-    sys.error("todo")
+  def functionMonoid[A,B](B: Monoid[B]): Monoid[A => B] = new Monoid[A => B] {
+    def op(f1: A => B, f2: A => B): A => B = a => B.op(f1(a), f2(a))
+    val zero: A => B = _ => B.zero
+  }
 
   def mapMergeMonoid[K,V](V: Monoid[V]): Monoid[Map[K, V]] =
     sys.error("todo")
@@ -138,13 +144,13 @@ trait Foldable[F[_]] {
     sys.error("todo")
 
   def foldMap[A, B](as: F[A])(f: A => B)(mb: Monoid[B]): B =
-    sys.error("todo")
+    foldRight(as)(mb.zero)((a, b) => mb.op(f(a), b))
 
   def concatenate[A](as: F[A])(m: Monoid[A]): A =
-    sys.error("todo")
+    foldRight(as)(m.zero)(m.op)
 
   def toList[A](as: F[A]): List[A] =
-    sys.error("todo")
+    foldRight(as)(List.empty[A])(_ :: _)
 }
 
 object ListFoldable extends Foldable[List] {
