@@ -28,9 +28,19 @@ case class Left[+E](get: E) extends Either[E,Nothing]
 case class Right[+A](get: A) extends Either[Nothing,A]
 
 object Either {
-  def traverse[E,A,B](es: List[A])(f: A => Either[E, B]): Either[E, List[B]] = sys.error("todo")
+  def traverse[E, A, B](as: List[A])(f: A => Either[E, B]): Either[E, List[B]] = {
+    def cons(x: A, y: Either[E, List[B]]): Either[E, List[B]] =
+      for {
+        xv <- f(x)
+        yv <- y
+      } yield xv :: yv
 
-  def sequence[E,A](es: List[Either[E,A]]): Either[E,List[A]] = sys.error("todo")
+    val z: Either[E, List[B]] = Right(Nil)
+    as.foldRight(z)(cons)
+  }
+
+  def sequence[E, A](es: List[Either[E, A]]): Either[E, List[A]] =
+    traverse(es)(identity)
 
   def mean(xs: IndexedSeq[Double]): Either[String, Double] = 
     if (xs.isEmpty) 
@@ -45,20 +55,4 @@ object Either {
   def Try[A](a: => A): Either[Exception, A] =
     try Right(a)
     catch { case e: Exception => Left(e) }
-
-  // exercise 4.7
-
-  def sequence[E, A](es: List[Either[E, A]]): Either[E, List[A]] =
-    traverse(es)(identity)
-
-  def traverse[E, A, B](as: List[A])(f: A => Either[E, B]): Either[E, List[B]] = {
-    def cons(x: A, y: Either[E, List[B]]): Either[E, List[B]] =
-      for {
-        xv <- f(x)
-        yv <- y
-      } yield xv :: yv
-
-    val z: Either[E, List[B]] = Right(Nil)
-    as.foldRight(z)(cons)
-  }
 }
