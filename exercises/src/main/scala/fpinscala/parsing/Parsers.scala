@@ -9,26 +9,60 @@ trait Parsers[Parser[+_]] { self => // so inner classes may call methods of trai
 
   implicit def operators[A](p: Parser[A]) = ParserOps[A](p)
 
+  implicit def regex(r: Regex): Parser[String]
+
   def run[A](p: Parser[A])(input: String): Either[ParseError,A]
 
-  def map[A,B](a: Parser[A])(f: A => B): Parser[B]
+  def flatMap[A,B](p: Parser[A])(f: A => Parser[B]): Parser[B]
 
-  def many[A](p: Parser[A]): Parser[List[A]]
+  def or[A](s1: Parser[A], s2: => Parser[A]): Parser[A]
 
-  def or[A](s1: Parser[A], s2: Parser[A]): Parser[A]
-
-  def product[A,B](p: Parser[A], p2: Parser[B]): Parser[(A,B)]
+  def slice[A](p: Parser[A]): Parser[String]
 
   def string(s: String): Parser[String]
+
+  def char(c: Char): Parser[Char] =
+    string(c.toString) map (_.charAt(0))
+
+  def listOfN[A](n: Int, p: Parser[A]): Parser[List[A]] =
+    if (n > 0) map2(p, listOfN(n - 1, p))(_ :: _) else succeed(List.empty)
+
+  def many[A](p: Parser[A]): Parser[List[A]] =
+    map2(p, many(p))(_ :: _).or(succeed(List.empty[A]))
 
   def many1[A](p: Parser[A]): Parser[List[A]] =
     map2(p, many(p))(_ :: _)
 
-  def map2[A,B,C](p: Parser[A], p2: Parser[B])(f: (A,B) => C): Parser[C] =
-    product(p, p2).map(f.tupled)
+  def map[A,B](a: Parser[A])(f: A => B): Parser[B] =
+    a.flatMap(va => succeed(f(va)))
+
+  def map2[A,B,C](p: Parser[A], p2: => Parser[B])(f: (A,B) => C): Parser[C] =
+    p.flatMap(a => p2.map(b => f(a, b)))
+    //product(p, p2).map(f.tupled)
+
+  def product[A,B](p: Parser[A], p2: => Parser[B]): Parser[(A,B)] =
+    p.flatMap(a => p2.map(b => (a, b)))
+
+  def succeed[A](a: A): Parser[A] =
+    string("").map(_ => a)
+
+  def nAndAs: Parser[String] =
+    regex("""\d""".r)
+      .map(Integer.valueOf)
+      .flatMap(n => listOfN(n, string("a")))
+      .map(_.mkString)
 
   case class ParserOps[A](p: Parser[A]) {
+    def |[B >: A](p2: => Parser[B]): Parser[B] = self.or(p, p2)
+    def or[B >: A](p2: => Parser[B]): Parser[B] = self.or(p, p2)
+    def flatMap[B](f: A => Parser[B]): Parser[B] = self.flatMap(p)(f)
     def map[B](f: A => B): Parser[B] = self.map(p)(f)
+    def many = self.many(p)
+    def as[B](b: B): Parser[B] = self.map(p)(_ => b)
+    def slice = self.slice(p)
+    def ~>[B](p2: Parser[B]): Parser[B] = self.product(p, p2).map(_._2)
+    def <~[B](p2: Parser[B]): Parser[A] = self.product(p, p2).map(_._1)
+    def <~>[B](p2: Parser[B]): Parser[(A, B)] = self.product(p, p2)
   }
 
   object Laws {
@@ -76,4 +110,57 @@ case class Location(input: String, offset: Int = 0) {
 
 case class ParseError(stack: List[(Location,String)] = List(),
                       otherFailures: List[ParseError] = List()) {
+}
+
+object Examples {
+  trait JSON
+  object JSON {
+    case object JNull extends JSON
+    case class JNumber(get: Double) extends JSON
+    case class JString(get: String) extends JSON
+    case class JBool(get: Boolean) extends JSON
+    case class JArray(get: IndexedSeq[JSON]) extends JSON
+    case class JObject(get: Map[String, JSON]) extends JSON
+  }
+
+  def jsonParser[Parser[+_]](P: Parsers[Parser]): Parser[JSON] = {
+    import JSON._
+    import P._
+
+    val spaces = char(' ').many.slice
+
+    val jNull = string("null").as(JNull)
+
+    val jBool = {
+      val t = string("true").as(true)
+      val f = string("false").as(false)
+      (t or f).map(b => JBool(b))
+    }
+
+    val jString: Parser[JString] = ???
+
+    val jNumber = regex("""-?(0|[1-9]\d*)(\.\d+|)([eE][+-]?\d+|)""".r)
+      .map(s => JNumber(s.toDouble))
+
+    def jValue: Parser[JSON] = jNull | jBool | jString | jNumber | jArray | jObject
+
+    def jArray: Parser[JArray] = ???
+
+    def jObject = {
+      def colon = spaces ~> string(":") <~ spaces
+      def jKeyValue = spaces ~> jString.map(_.get) <~ colon <~> jValue <~ spaces
+
+      val open = spaces ~> string("{") <~ spaces
+      val close = spaces ~> string("}") <~ spaces
+
+      val empty = open ~> close as Map.empty[String, JSON]
+      val nonEmpty = open ~> (jKeyValue <~> (string(",") ~> jKeyValue).many).map {
+        case (x, xs) => (x :: xs).toMap
+      } <~ close
+
+      (empty | nonEmpty).map(m => JObject(m))
+    }
+
+    jValue
+  }
 }
