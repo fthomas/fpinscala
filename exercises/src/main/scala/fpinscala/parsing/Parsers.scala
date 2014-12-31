@@ -92,6 +92,64 @@ trait Parsers[Parser[+_]] { self => // so inner classes may call methods of trai
   }
 }
 
+object Impl {
+  trait Result[+A] {
+    def mapError(f: ParseError => ParseError): Result[A] = this match {
+      case Failure(e,c) => Failure(f(e),c)
+      case _ => this
+    }
+  }
+  case class Success[+A](get: A, charsConsumed: Int) extends Result[A]
+  case class Failure(get: ParseError,
+                     isCommitted: Boolean = false) extends Result[Nothing]
+
+
+  type Parser[+A] = Location => Result[A]
+
+  object Parser extends Parsers[Parser] {
+
+    def string(s: String): Parser[String] =
+      (l: Location) =>
+        if (l.input.startsWith(s))
+          Success(s, s.length)
+        else
+          Failure(l.toError("Expected: " + s))
+
+    def regex(r: Regex): Parser[String] =
+      (l: Location) =>
+        r.findPrefixMatchOf(l.input) match {
+          case Some(m) => Success(m.matched, m.matched.length)
+          case None    => Failure(l.toError("Does not match: " + r.toString()))
+        }
+
+    def flatMap[A, B](p: Parser[A])(f: A => Parser[B]): Parser[B] = ???
+
+    def or[A](x: Parser[A], y: => Parser[A]): Parser[A] =
+      s => x(s) match {
+        case Failure(e,false) => y(s)
+        case r => r
+      }
+
+    def run[A](p: Parser[A])(input: String): Either[ParseError, A] = ???
+
+    def slice[A](p: Parser[A]): Parser[String] =
+      (l: Location) => p(l) match {
+        case Success(_, n) => Success(l.input.take(n), n)
+        case Failure(get, c) => Failure(get, c)
+      }
+
+    override def succeed[A](a: A): Parser[A] =
+      (l: Location) => Success(a, 0)
+
+    def scope[A](msg: String)(p: Parser[A]): Parser[A] =
+      s => p(s).mapError(_.push(s, msg))
+
+    def label[A](msg: String)(p: Parser[A]): Parser[A] =
+      s => p(s).mapError(_.label(msg))
+
+  }
+}
+
 case class Location(input: String, offset: Int = 0) {
 
   lazy val line = input.slice(0,offset+1).count(_ == '\n') + 1
@@ -110,6 +168,19 @@ case class Location(input: String, offset: Int = 0) {
 
 case class ParseError(stack: List[(Location,String)] = List(),
                       otherFailures: List[ParseError] = List()) {
+
+  def push(loc: Location, msg: String): ParseError =
+    copy(stack = (loc,msg) :: stack)
+
+  def label[A](s: String): ParseError =
+    ParseError(latestLoc.map((_,s)).toList)
+
+  def latestLoc: Option[Location] =
+    latest map (_._1)
+
+  def latest: Option[(Location,String)] =
+    stack.lastOption
+
 }
 
 object Examples {
