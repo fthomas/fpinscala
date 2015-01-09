@@ -140,8 +140,10 @@ object Monoid {
       case _ => 0
     }
 
-  def productMonoid[A,B](A: Monoid[A], B: Monoid[B]): Monoid[(A, B)] =
-    sys.error("todo")
+  def productMonoid[A,B](A: Monoid[A], B: Monoid[B]): Monoid[(A, B)] = new Monoid[(A, B)] {
+    def op(x: (A, B), y: (A, B)): (A, B) = (A.op(x._1, y._1), B.op(x._2, y._2))
+    val zero: (A, B) = (A.zero, B.zero)
+  }
 
   def functionMonoid[A,B](B: Monoid[B]): Monoid[A => B] = new Monoid[A => B] {
     def op(f1: A => B, f2: A => B): A => B = a => B.op(f1(a), f2(a))
