@@ -87,6 +87,7 @@ object Monoid {
   def foldLeft[A, B](as: List[A])(z: B)(f: (B, A) => B): B =
     foldMap(as, dual(endoMonoid[B]))(a => b => f(b, a))(z)
 
+  // 10.7
   def foldMapV[A, B](as: IndexedSeq[A], m: Monoid[B])(f: A => B): B = {
     if (as.length == 0)
       m.zero
@@ -100,6 +101,7 @@ object Monoid {
     }
   }
 
+  // 10.9
   def ordered(ints: IndexedSeq[Int]): Boolean = {
     foldMapV(ints, ???)(???)
     ???
@@ -109,15 +111,34 @@ object Monoid {
   case class Stub(chars: String) extends WC
   case class Part(lStub: String, words: Int, rStub: String) extends WC
 
-  def par[A](m: Monoid[A]): Monoid[Par[A]] = 
-    sys.error("todo")
+  // 10.8
+  def par[A](m: Monoid[A]): Monoid[Par[A]] = new Monoid[Par[A]] {
+    def op(a1: Par[A], a2: Par[A]): Par[A] = Par.map2(a1, a2)(m.op)
+    def zero: Par[A] = Par.unit(m.zero)
+  }
 
-  def parFoldMap[A,B](v: IndexedSeq[A], m: Monoid[B])(f: A => B): Par[B] = 
-    sys.error("todo") 
+  def parFoldMap[A,B](v: IndexedSeq[A], m: Monoid[B])(f: A => B): Par[B] =
+    foldMapV(v, par(m))(f.andThen(Par.unit))
 
-  val wcMonoid: Monoid[WC] = sys.error("todo")
+  val wcMonoid: Monoid[WC] = new Monoid[WC] {
+    def op(a1: WC, a2: WC): WC =
+      (a1, a2) match {
+        case (Stub(c1), Stub(c2))        => Stub(c1 + c2)
+        case (Stub(c1), Part(ls, w, rs)) => Part(c1 + ls, w, rs)
+        case (Part(ls, w, rs), Stub(c2)) => Part(ls, w, rs + c2)
+        case (Part(ls1, w1, rs1), Part(ls2, w2, rs2)) =>
+          val wc = if ((rs1 + ls2).isEmpty) 0 else 1
+          Part(ls1, w1 + w2 + wc, rs2)
+      }
 
-  def count(s: String): Int = sys.error("todo")
+    def zero: WC = Stub("")
+  }
+
+  def count(s: String): Int =
+    foldMapV(s, wcMonoid)(c => if (c == ' ') Part("", 0, "") else Stub(c.toString)) match {
+      case Part(ls, wc, rs) => wc + (if (ls.nonEmpty) 1 else 0) + (if (rs.nonEmpty) 1 else 0)
+      case _ => 0
+    }
 
   def productMonoid[A,B](A: Monoid[A], B: Monoid[B]): Monoid[(A, B)] =
     sys.error("todo")
