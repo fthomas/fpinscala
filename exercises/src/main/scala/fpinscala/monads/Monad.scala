@@ -64,9 +64,13 @@ trait Monad[M[_]] extends Functor[M] {
   def join[A](mma: M[M[A]]): M[A] =
     flatMap(mma)(identity)
 
-  // Implement in terms of `join`:
+  // Implement in terms of `join` and `map`:
   def __flatMap[A,B](ma: M[A])(f: A => M[B]): M[B] =
     join(map(ma)(f))
+
+  def __compose[A,B,C](f: A => M[B], g: B => M[C]): A => M[C] =
+    a => join(map(f(a))(g))
+
 }
 
 case class Reader[R, A](run: R => A)
@@ -98,8 +102,8 @@ object Monad {
   }
 
   def parserMonad[P[+_]](p: Parsers[P]): Monad[P] = new Monad[P] {
-    def flatMap[A, B](ma: P[A])(f: (A) => P[B]): P[B] = ???
-    def unit[A](a: => A): P[A] = ???
+    def flatMap[A, B](ma: P[A])(f: (A) => P[B]): P[B] = p.flatMap(ma)(f)
+    def unit[A](a: => A): P[A] = p.succeed(a)
   }
 
   val optionMonad: Monad[Option] = new Monad[Option] {
