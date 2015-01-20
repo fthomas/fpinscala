@@ -133,7 +133,16 @@ object SimpleStreamTransducers {
     /*
      * Exercise 5: Implement `|>`. Let the types guide your implementation.
      */
-    def |>[O2](p2: Process[O,O2]): Process[I,O2] = ???
+    def |>[O2](p2: Process[O,O2]): Process[I,O2] =
+      p2 match {
+        case Halt() => Halt()
+        case Emit(h, t) => Emit(h, this |> t)
+        case Await(recv2) => this match {
+          case Halt() => Halt() |> recv2(None)
+          case Emit(h1, t1) => t1 |> recv2(Some(h1))
+          case Await(recv1) => Await(i => recv1(i) |> p2)
+        }
+      }
 
     /*
      * Feed `in` to this `Process`. Uses a tail recursive loop as long
@@ -197,7 +206,8 @@ object SimpleStreamTransducers {
     /*
      * Exercise 6: Implement `zipWithIndex`.
      */
-    def zipWithIndex: Process[I,(O,Int)] = ???
+    def zipWithIndex: Process[I,(O,Int)] =
+      this |> loop(0)((o, s) => ((o, s), s + 1))
 
     /* Add `p` to the fallback branch of this process */
     def orElse(p: Process[I,O]): Process[I,O] = this match {
@@ -316,7 +326,11 @@ object SimpleStreamTransducers {
     /*
      * Exercise 2: Implement `count`.
      */
-    def count[I]: Process[I,Int] = ???
+    def count[I]: Process[I,Int] = {
+      def go(n: Int): Process[I,Int] =
+        await(_ => emit(n), go(n + 1))
+      go(0)
+    }
 
     /* For comparison, here is an explicit recursive implementation. */
     def count2[I]: Process[I,Int] = {
@@ -328,7 +342,16 @@ object SimpleStreamTransducers {
     /*
      * Exercise 3: Implement `mean`.
      */
-    def mean: Process[Double,Double] = ???
+    def mean: Process[Double,Double] = {
+      def go(sum: Double, n: Int): Process[Double,Double] = {
+        await { i =>
+          val newSum = sum + i
+          val newN = n + 1
+          emit(newSum / newN, go(newSum, newN))
+        }
+      }
+      go(0.0, 0)
+    }
 
     def loop[S,I,O](z: S)(f: (I,S) => (O,S)): Process[I,O] =
       await((i: I) => f(i,z) match {
@@ -337,15 +360,24 @@ object SimpleStreamTransducers {
 
     /* Exercise 4: Implement `sum` and `count` in terms of `loop` */
 
-    def sum2: Process[Double,Double] = ???
+    def sum2: Process[Double,Double] = loop(0.0)((i, s) => (i + s, i + s))
 
-    def count3[I]: Process[I,Int] = ???
+    def count3[I]: Process[I,Int] = loop(0)((i, n) => (n + 1, n + 1))
 
     /*
      * Exercise 7: Can you think of a generic combinator that would
      * allow for the definition of `mean` in terms of `sum` and
      * `count`?
      */
+
+    def zip[I,A,B](p1: Process[I, A], p2: Process[I, B]): Process[I, (A, B)] =
+      (p1, p2) match {
+        case (Halt(), _) => Halt()
+        case (_, Halt()) => Halt()
+        case (Emit(h1, t1), Emit(h2, t2)) => Emit((h1, h2), zip(t1, t2))
+        case (Await(recv1), _) => Await(oi => zip(feed(oi)(recv1(oi)), p2))
+        case (_, Await(recv2)) => Await(oi => zip(p1, feed(oi)(recv2(oi))))
+      }
 
     def feed[A,B](oa: Option[A])(p: Process[A,B]): Process[A,B] =
       p match {
@@ -513,8 +545,19 @@ object GeneralizedStreamTransducers {
      * below, this is not tail recursive and responsibility for stack safety
      * is placed on the `Monad` instance.
      */
-    def runLog(implicit F: MonadCatch[F]): F[IndexedSeq[O]] = ???
-
+    def runLog(implicit F: MonadCatch[F]): F[IndexedSeq[O]] = {
+      def go(p: Process[F, O], acc: IndexedSeq[O]): F[IndexedSeq[O]] =
+        p match {
+          case Emit(h, t) => go(t, acc :+ h)
+          case Halt(End)  => F.unit(acc)
+          case Halt(err)  => F.fail(err)
+          case Await(req, recv) => {
+            F.flatMap(F.attempt(req))(e => go(Try(recv(e)), acc))
+          }
+        }
+      go(this, IndexedSeq.empty)
+    }
+    
     /*
      * We define `Process1` as a type alias - see the companion object
      * for `Process` below. Using that, we can then define `|>` once
